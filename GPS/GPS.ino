@@ -1,7 +1,7 @@
 #include <Adafruit_GPS.h>
 #include <Adafruit_GPS.h>
 //We can now create our Software Serial object after including the library
-SoftwareSerial mySerial(0, 1);
+SoftwareSerial mySerial(14, 15);
 
 //And finally attach our Serial object pins to our GPS module
 Adafruit_GPS GPS(&mySerial);
