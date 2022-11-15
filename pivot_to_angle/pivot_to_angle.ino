@@ -16,6 +16,10 @@
 
 #include <Adafruit_GPS.h>
 #include <math.h>
+#include <DFRobot_QMC5883.h>
+#include <Wire.h>
+
+DFRobot_QMC5883 compass(&Wire, /*I2C addr*/HMC5883L_ADDRESS);
 
 // what's the name of the hardware serial port?
 #define GPSSerial Serial3
@@ -29,34 +33,12 @@ Adafruit_GPS GPS(&GPSSerial);
 
 uint32_t timer = millis();
 
-#define wheel0 50 // Initialize pins to drive wheels
+#define wheel0 46 // Initialize pins to drive wheels
 #define wheel1 51 
-#define wheel2 52 
+#define wheel2 48 
 #define wheel3 53
-
-double get_angle(){
-  double initial_lat = GPS.latitudeDegrees;
-  double initial_lon = GPS.longitudeDegrees;
-  digitalWrite(wheel0, HIGH); // Turn wheels all on
-  digitalWrite(wheel1, LOW);
-  digitalWrite(wheel2, HIGH);
-  digitalWrite(wheel3, LOW);
-  delay(3000);
-  digitalWrite(wheel0, LOW); // Turn wheels off
-  digitalWrite(wheel1, LOW);
-  digitalWrite(wheel2, LOW);
-  digitalWrite(wheel3, LOW);
-  delay(500);
-
-  double final_lat = GPS.latitudeDegrees;
-  double final_lon = GPS.longitudeDegrees;
-  double d_lat = final_lat - initial_lat;
-  double d_lon = final_lon - initial_lon;
-  double magnitude = sqrt((d_lat*d_lat) + (d_lon*d_lon));
-
-  double angle = atan(d_lon / d_lat);
-  return angle;
-}
+#define lat_targ 40.002117
+#define lon_targ -83.015907
 
 
 void setup()
@@ -92,14 +74,37 @@ void setup()
   pinMode(wheel1, OUTPUT);//Define  as output
   pinMode(wheel2, OUTPUT);//Define  as output
   pinMode(wheel3, OUTPUT);//Define  as output
+
+
+  // Serial.begin(9600);
+  // while (!compass.begin())
+  // {
+  //   Serial.println("Could not find a valid 5883 sensor, check wiring!");
+  //   delay(500);
+  // }
+
+  // if(compass.isHMC())
+  // {
+  //   // Serial.println("Initialize HMC5883");
+
+  // }
+  // else if(compass.isQMC())
+  // {
+  //   // Serial.println("Initialize QMC5883");
+  // }
+  // else if(compass.isVCM())
+  // {
+  //   // Serial.println("Initialize VCM5883L");
+  // }
+  // delay(1000);
+  compass.begin();
+  // delay(1000);
 }
 
 void loop() // run over and over again
 {
-  delay(20000);
   // read data from the GPS in the 'main loop'
   char c = GPS.read();
-  double angle;
   // if you want to debug, this is a good time to do it!
   if (GPSECHO)
     if (c) Serial.print(c);
@@ -145,22 +150,101 @@ void loop() // run over and over again
       Serial.print("Altitude: "); Serial.println(GPS.altitude);
       Serial.print("Satellites: "); Serial.println((int)GPS.satellites);
       Serial.print("Antenna status: "); Serial.println((int)GPS.antenna);
+
+      //get angle and dsitance 
+      /********************************************/
+      double dlat = lat_targ - GPS.latitudeDegrees;
+      double dlon = lon_targ - GPS.longitudeDegrees;
+
+      double angle = atan(dlat / dlon) * 57.2958;
+      if (angle < 0) {
+        angle = 180 + angle;
+      }
+
+      
+
+      Serial.println(GPS.latitudeDegrees, 5);
+      Serial.println(GPS.longitudeDegrees, 5);
+
+      /********************************************/
+
+      
       
 
       
-      double angle = get_angle();
-      // while(abs(get_angle() - 0) > 45.0) {
-      //   //turn right 
-      //   digitalWrite(wheel0, LOW); // Turn left wheels back, right wheels forward
-      //   digitalWrite(wheel1, LOW);
-      //   digitalWrite(wheel2, HIGH);
-      //   digitalWrite(wheel3, HIGH);
-      // }
+      float declinationAngle = (4.0 + (26.0 / 60.0)) / (180 / PI);
+      compass.setDeclinationAngle(declinationAngle);
+      sVector_t mag = compass.readRaw();
+      compass.getHeadingDegrees();
+
+      //spin to approx direction
+      while(abs(compass.readRaw().HeadingDegress - angle) > 5) {
+        //turn right 
+        Serial.println(compass.readRaw().HeadingDegress, 5);
+        digitalWrite(wheel0, LOW); // Turn left wheels back, right wheels forward
+        digitalWrite(wheel1, LOW);
+        digitalWrite(wheel2, HIGH);
+        digitalWrite(wheel3, HIGH);
+        declinationAngle = (4.0 + (26.0 / 60.0)) / (180 / PI);
+        compass.setDeclinationAngle(declinationAngle);
+        sVector_t mag = compass.readRaw();
+        compass.getHeadingDegrees();
+      }
     
-      // digitalWrite(wheel0, LOW); // Turn wheels off
-      // digitalWrite(wheel1, LOW);
-      // digitalWrite(wheel2, LOW);
-      // digitalWrite(wheel3, LOW);
+      digitalWrite(wheel0, LOW); // Turn wheels off
+      digitalWrite(wheel1, LOW);
+      digitalWrite(wheel2, LOW);
+      digitalWrite(wheel3, LOW);
+      delay(500);
+
+      char c = GPS.read();
+      // if you want to debug, this is a good time to do it!
+      if (GPSECHO)
+        if (c) Serial.print(c);
+      // if a sentence is received, we can check the checksum, parse it...
+      if (GPS.newNMEAreceived()) {
+        // a tricky thing here is if we print the NMEA sentence, or data
+        // we end up not listening and catching other sentences!
+        // so be very wary if using OUTPUT_ALLDATA and trying to print out data
+        Serial.print(GPS.lastNMEA()); // this also sets the newNMEAreceived() flag to false
+        if (!GPS.parse(GPS.lastNMEA())) // this also sets the newNMEAreceived() flag to false
+          return; // we can fail to parse a sentence in which case we should just wait for another
+      }
+
+      // go foreward until ditance is met
+      dlat = lat_targ - GPS.latitudeDegrees;
+      dlon = lon_targ - GPS.longitudeDegrees;
+      double dist = sqrt(dlat*dlat + dlon*dlon);
+      while(dist > 0.0001){
+        digitalWrite(wheel0, HIGH); // Turn wheels all on
+        digitalWrite(wheel1, LOW);
+        digitalWrite(wheel2, HIGH);
+        digitalWrite(wheel3, LOW);
+
+      
+        dlat = lat_targ - GPS.latitudeDegrees;
+        dlon = lon_targ - GPS.longitudeDegrees;
+        dist = sqrt(dlat*dlat + dlon*dlon);
+        Serial.println(dist, 10);
+
+        char c = GPS.read();
+        // if you want to debug, this is a good time to do it!
+        if (GPSECHO)
+          if (c) Serial.print(c);
+        // if a sentence is received, we can check the checksum, parse it...
+        if (GPS.newNMEAreceived()) {
+          // a tricky thing here is if we print the NMEA sentence, or data
+          // we end up not listening and catching other sentences!
+          // so be very wary if using OUTPUT_ALLDATA and trying to print out data
+          Serial.print(GPS.lastNMEA()); // this also sets the newNMEAreceived() flag to false
+          if (!GPS.parse(GPS.lastNMEA())) // this also sets the newNMEAreceived() flag to false
+            return; // we can fail to parse a sentence in which case we should just wait for another
+        }
+      }
+      digitalWrite(wheel0, LOW); // Turn wheels off
+      digitalWrite(wheel1, LOW);
+      digitalWrite(wheel2, LOW);
+      digitalWrite(wheel3, LOW);
 
     }
     else{
@@ -170,11 +254,25 @@ void loop() // run over and over again
       digitalWrite(wheel2, HIGH);
       digitalWrite(wheel3, LOW);
       delay(1000);
+      digitalWrite(wheel0, LOW); // stop
+      digitalWrite(wheel1, LOW);
+      digitalWrite(wheel2, LOW);
+      digitalWrite(wheel3, LOW);
+      delay(1000);
       digitalWrite(wheel0, LOW); // backwards
       digitalWrite(wheel1, HIGH);
       digitalWrite(wheel2, LOW);
       digitalWrite(wheel3, HIGH);
       delay(1000);
+      digitalWrite(wheel0, LOW); // stop
+      digitalWrite(wheel1, LOW);
+      digitalWrite(wheel2, LOW);
+      digitalWrite(wheel3, LOW);
+      delay(1000);
     }
   }
+  digitalWrite(wheel0, LOW); // Turn wheels off
+  digitalWrite(wheel1, LOW);
+  digitalWrite(wheel2, LOW);
+  digitalWrite(wheel3, LOW);
 }
