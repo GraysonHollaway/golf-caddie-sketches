@@ -28,6 +28,13 @@ Adafruit_GPS GPS(&mySerial);
 // Set GPSECHO to 'false' to turn off echoing the GPS data to the Serial console
 // Set to 'true' if you want to debug and listen to the raw GPS sentences
 #define GPSECHO  true
+#define button_pin 2
+#define LED_pin 4
+volatile bool state = 0;
+
+void toggle(){
+  state = !state;
+}
 
 void setup()
 {
@@ -61,15 +68,21 @@ void setup()
   delay(1000);
   // Ask for firmware version
   mySerial.println(PMTK_Q_RELEASE);
+
+  pinMode(button_pin, INPUT_PULLUP);
+  pinMode(LED_pin, OUTPUT);
+  attachInterrupt(digitalPinToInterrupt(button_pin), toggle, RISING);
 }
 
 uint32_t timer = millis();
 void loop()                     // run over and over again
 {
+  // Serial.println(digitalRead(button_pin));
+  digitalWrite(LED_pin, state);
   char c = GPS.read();
   // if you want to debug, this is a good time to do it!
   if ((c) && (GPSECHO))
-    Serial.write(c);
+    //Serial.write(c);
 
   // if a sentence is received, we can check the checksum, parse it...
   if (GPS.newNMEAreceived()) {
@@ -81,46 +94,59 @@ void loop()                     // run over and over again
     if (!GPS.parse(GPS.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
       return;  // we can fail to parse a sentence in which case we should just wait for another
   }
-  char test_char = GPS.read();
+  //char test_char = GPS.read();
 
   // approximately every 2 seconds or so, print out the current stats
-  if (millis() - timer > 2000) {
+  if ((millis() - timer > 2000)) {
     timer = millis(); // reset the timer
-    double lat = GPS.latitudeDegrees;
-    double lon = GPS.longitudeDegrees;
-    BTSerial.println(lat, 10);
-    BTSerial.println(lon, 10);
+    if(state){
+      double lat = GPS.latitudeDegrees;
+      double lon = GPS.longitudeDegrees;
+      BTSerial.print(lat, 10);
+      BTSerial.print(",");
+      BTSerial.println(lon, 10);
 
-    Serial.print("\nTime: ");
-    if (GPS.hour < 10) { Serial.print('0'); }
-    Serial.print(GPS.hour, DEC); Serial.print(':');
-    if (GPS.minute < 10) { Serial.print('0'); }
-    Serial.print(GPS.minute, DEC); Serial.print(':');
-    if (GPS.seconds < 10) { Serial.print('0'); }
-    Serial.print(GPS.seconds, DEC); Serial.print('.');
-    if (GPS.milliseconds < 10) {
-      Serial.print("00");
-    } else if (GPS.milliseconds > 9 && GPS.milliseconds < 100) {
-      Serial.print("0");
+      Serial.println(lat, 10);
+      Serial.println(lon, 10);
     }
-    Serial.println(GPS.milliseconds);
-    Serial.print("Date: ");
-    Serial.print(GPS.day, DEC); Serial.print('/');
-    Serial.print(GPS.month, DEC); Serial.print("/20");
-    Serial.println(GPS.year, DEC);
-    Serial.print("Fix: "); Serial.print((int)GPS.fix);
-    Serial.print(" quality: "); Serial.println((int)GPS.fixquality);
-    if (GPS.fix) {
-      Serial.print("Location: ");
-      Serial.print(GPS.latitude, 4); Serial.print(GPS.lat);
-      Serial.print(", ");
-      Serial.print(GPS.longitude, 4); Serial.println(GPS.lon);
+    else{
+      BTSerial.println("Disabled");
+    }
+    
+    
 
-      Serial.print("Speed (knots): "); Serial.println(GPS.speed);
-      Serial.print("Angle: "); Serial.println(GPS.angle);
-      Serial.print("Altitude: "); Serial.println(GPS.altitude);
-      Serial.print("Satellites: "); Serial.println((int)GPS.satellites);
-      Serial.print("Antenna status: "); Serial.println((int)GPS.antenna);
-    }
+    // Serial.print("\nTime: ");
+    // if (GPS.hour < 10) { Serial.print('0'); }
+    // Serial.print(GPS.hour, DEC); Serial.print(':');
+    // if (GPS.minute < 10) { Serial.print('0'); }
+    // Serial.print(GPS.minute, DEC); Serial.print(':');
+    // if (GPS.seconds < 10) { Serial.print('0'); }
+    // Serial.print(GPS.seconds, DEC); Serial.print('.');
+    // if (GPS.milliseconds < 10) {
+    //   Serial.print("00");
+    // } else if (GPS.milliseconds > 9 && GPS.milliseconds < 100) {
+    //   Serial.print("0");
+    // }
+    // Serial.println(GPS.milliseconds);
+    // Serial.print("Date: ");
+    // Serial.print(GPS.day, DEC); Serial.print('/');
+    // Serial.print(GPS.month, DEC); Serial.print("/20");
+    // Serial.println(GPS.year, DEC);
+    // Serial.print("Fix: "); Serial.print((int)GPS.fix);
+    // Serial.print(" quality: "); Serial.println((int)GPS.fixquality);
+    // if (GPS.fix) {
+    //   Serial.print("Location: ");
+    //   Serial.print(GPS.latitude, 4); Serial.print(GPS.lat);
+    //   Serial.print(", ");
+    //   Serial.print(GPS.longitude, 4); Serial.println(GPS.lon);
+
+    //   Serial.print("Speed (knots): "); Serial.println(GPS.speed);
+    //   Serial.print("Angle: "); Serial.println(GPS.angle);
+    //   Serial.print("Altitude: "); Serial.println(GPS.altitude);
+    //   Serial.print("Satellites: "); Serial.println((int)GPS.satellites);
+    //   Serial.print("Antenna status: "); Serial.println((int)GPS.antenna);
+    // }
   }
 }
+
+

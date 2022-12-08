@@ -3,24 +3,21 @@
 SoftwareSerial mySerial(8,9);
 void setup() {
   // put your setup code here, to run once:
- mySerial.begin(38400);
+ Serial2.begin(38400);
  Serial.begin(9600);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   String lon = "";
-  if(mySerial.available()){
+  if(Serial2.available()){
     delay(30);
-    while(mySerial.available()){
-    char inByte = mySerial.read();
-    mySerial.write(inByte);
+    while(Serial2.available()){
+    char inByte = Serial2.read();
+    Serial2.write(inByte);
     lon += inByte;
     
     }
     Serial.println(lon);
   }
-  
-  
-  
 }
